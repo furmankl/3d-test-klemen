@@ -1,0 +1,6 @@
+dist
+node_modules
+.tmp-reference
+project
+package-lock.json
+*.pdf

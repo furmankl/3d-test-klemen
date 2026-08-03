@@ -1,0 +1,50 @@
+[
+  {
+    "id": "survey-marker-a",
+    "name": "Merilna točka A",
+    "type": "sphere",
+    "position": { "x": -3, "y": 0.7, "z": -1 },
+    "color": "#2dd4bf",
+    "visible": true
+  },
+  {
+    "id": "utility-building",
+    "name": "Objekt postaje",
+    "type": "box",
+    "position": { "x": 0, "y": 0.9, "z": 0 },
+    "color": "#38bdf8",
+    "visible": true
+  },
+  {
+    "id": "antenna-north",
+    "name": "Severni oddajnik",
+    "type": "cylinder",
+    "position": { "x": 3, "y": 1.3, "z": -2 },
+    "color": "#fb923c",
+    "visible": true
+  },
+  {
+    "id": "survey-marker-b",
+    "name": "Merilna točka B",
+    "type": "sphere",
+    "position": { "x": 2.5, "y": 0.55, "z": 2.5 },
+    "color": "#a78bfa",
+    "visible": true
+  },
+  {
+    "id": "control-cube",
+    "name": "Kontrolni volumen",
+    "type": "box",
+    "position": { "x": -2, "y": 0.6, "z": 2.8 },
+    "color": "#facc15",
+    "visible": true
+  },
+  {
+    "id": "antenna-south",
+    "name": "Južni oddajnik",
+    "type": "cylinder",
+    "position": { "x": 4, "y": 1, "z": 1 },
+    "color": "#f472b6",
+    "visible": true
+  }
+]
