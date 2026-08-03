@@ -37,6 +37,7 @@ import { reactive, watch } from 'vue'
 import type { SceneObjectData, SceneObjectPatch, Vector3Data } from '@/types/sceneObject'
 
 const props = defineProps<{ object: SceneObjectData | null }>()
+const emit = defineEmits<{  change: [], save: [id: string, patch: SceneObjectPatch],  }>()
 const draft = reactive({ name: '', color: '#ffffff', visible: true })
 let changed: boolean = false
 
