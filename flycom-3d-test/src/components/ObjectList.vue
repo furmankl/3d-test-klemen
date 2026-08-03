@@ -55,9 +55,8 @@ const labels: Record<SceneObjectType, string> = {
 const typeLabel = (type: SceneObjectType) => labels[type]
 
 function handleSelect(id: string): void {
-  // TODO(candidate): synchronize list selection with the store and 3D view.
-  void id
-  void emit
+  //  synchronize list selection with the store and 3D view.
+  emit('select', id);
 }
 
 function onFilterChange(event: Event): void {

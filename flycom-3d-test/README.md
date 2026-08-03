@@ -112,3 +112,17 @@ README dopolni s kratkim poročilom:
 - katere pomembnejše arhitekturne odločitve in odprtokodne knjižnice si izbral ter zakaj.
 
 Želimo ti uspešen testni dan!
+
+
+
+
+
+
+____________________________________________________________________________
+# Poročilo Klemen:
+
+implementirano:
+- efekt na izbranem objektu (opacity + scale)
+- izbira objekta ali iz seznama ali z klikom na raycast (je že bil implementiran)
+- gumb "Shrani spremembe" se omogoči ko je sprememba v formi
+- Forma "Izbrani objekt" deluje (skrivanje objekta, shranjevanje) 

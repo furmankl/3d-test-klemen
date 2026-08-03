@@ -3,22 +3,29 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createThreeObject } from '@/utils/createThreeObject'
 import { disposeThreeObject } from '@/utils/disposeThreeObject'
 import type { SceneObjectData } from '@/types/sceneObject'
+import { useSceneObjectsStore } from '@/stores/sceneObjectsStore'
+import { storeToRefs } from 'pinia'
 
 export interface ThreeSceneController {
   syncObjects: (objects: SceneObjectData[]) => void
   pickObjectId: (event: PointerEvent) => string | null
   dispose: () => void
+  highlightObject: (id: string | null) => void
 }
 
 export function createThreeScene(container: HTMLElement): ThreeSceneController {
   const scene = new THREE.Scene()
+  const sceneObjectsStore = useSceneObjectsStore();
+
+  const { selectedObjectId } = storeToRefs(sceneObjectsStore);
+  const { select } = sceneObjectsStore
   scene.background = new THREE.Color('#101d2b')
   scene.fog = new THREE.Fog('#101d2b', 18, 34)
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100)
   camera.position.set(9, 8, 11)
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.shadowMap.enabled = true
   container.appendChild(renderer.domElement)
@@ -75,6 +82,7 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
         disposeThreeObject(mesh)
         meshes.delete(id)
       }
+      highlightObject(id);
     }
     for (const item of objects) {
       let mesh = meshes.get(item.id)
@@ -85,7 +93,9 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
       }
       mesh.name = item.name
       mesh.visible = item.visible
-      ;(mesh.material as THREE.MeshStandardMaterial).color.set(item.color)
+      console.log(`Syncing object: ${item.name}, ID: ${item.id}, Visible: ${item.visible}, Color: ${item.color}`)
+      ;
+      (mesh.material as THREE.MeshStandardMaterial).color.set(item.color)
     }
   }
 
@@ -94,7 +104,12 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
     pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1
     raycaster.setFromCamera(pointer, camera)
-    const hit = raycaster.intersectObjects([...meshes.values()], false)[0]
+    const hit = raycaster.intersectObjects([...meshes.values()], false)[0];
+
+    if(hit?.object.userData.sceneObjectId) {
+      select(hit.object.userData.sceneObjectId);
+    }
+    
     return typeof hit?.object.userData.sceneObjectId === 'string'
       ? hit.object.userData.sceneObjectId
       : null
@@ -110,5 +125,24 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
     renderer.domElement.remove()
   }
 
-  return { syncObjects, pickObjectId, dispose }
+  function highlightObject(id: string | null): void {
+    const highlight = selectedObjectId.value === id;
+    // Create outline object
+    
+    if(id) {
+      if(meshes.has(id)) {
+        // set opacity + scale it up
+
+        meshes.get(id)?.scale.set(highlight ? 1.05 : 1.0, highlight ? 1.05 : 1.0, highlight ? 1.05 : 1.0);
+        const material = meshes.get(id)?.material as THREE.MeshStandardMaterial
+
+        material.transparent = true;
+        material.opacity = highlight ? 0.9 : 1.0; 
+        material.needsUpdate = true 
+      }
+    }
+
+    animate();
+  }
+  return { syncObjects, pickObjectId, dispose, highlightObject }
 }

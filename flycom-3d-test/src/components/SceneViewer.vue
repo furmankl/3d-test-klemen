@@ -12,6 +12,11 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { createThreeScene, type ThreeSceneController } from '@/composables/useThreeScene'
 import type { SceneObjectData } from '@/types/sceneObject'
+import { useSceneObjectsStore } from '@/stores/sceneObjectsStore';
+import { storeToRefs } from 'pinia';
+
+const sceneObjectsStore = useSceneObjectsStore();
+const { selectedObjectId } = storeToRefs(sceneObjectsStore);
 
 const props = defineProps<{ objects: SceneObjectData[]; selectedId: string | null }>()
 const emit = defineEmits<{ objectSelected: [id: string | null] }>()
@@ -24,17 +29,29 @@ onMounted(() => {
   controller.syncObjects(props.objects)
 })
 
+
 watch(
-  () => props.objects,
-  (objects) => controller?.syncObjects(objects),
-  { deep: true },
+  () => selectedObjectId,
+   (newValue, oldValue) => {
+      if(newValue) {
+        console.log("new selected object id:", newValue, "old selected object id:", oldValue);
+        controller?.syncObjects(props.objects);
+        controller?.highlightObject(newValue.value);
+      }
+    },
+    { deep: true },
+  )
+
+watch(
+   () => props.objects,
+   (objects) => controller?.syncObjects(objects),
+   { deep: true },
 )
 
 function handlePointerUp(event: PointerEvent): void {
   const id = controller?.pickObjectId(event) ?? null
-  // TODO(candidate): connect raycast result with the shared selection state.
-  void id
-  void emit
+  emit('objectSelected', id)
+
 }
 
 onBeforeUnmount(() => controller?.dispose())
