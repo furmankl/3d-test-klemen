@@ -57,7 +57,8 @@ export const sceneObjectsApi = {
   async add(input: NewSceneObject): Promise<SceneObjectData> {
     await wait()
     const objects = readStoredObjects() ?? cloneInitial()
-    const created: SceneObjectData = { ...structuredClone(input), id: crypto.randomUUID() }
+    const created: SceneObjectData = { ...input, id: crypto.randomUUID() }
+
     persist([...objects, created])
     return created
   },
@@ -71,10 +72,19 @@ export const sceneObjectsApi = {
     persist(objects)
     return updated
   },
+  async delete(id: string): Promise<SceneObjectData[]> {
+    await wait()
+    let objects = readStoredObjects() ?? cloneInitial()
+    const index = objects.findIndex((item) => item.id === id)
+    if (index < 0) throw new SceneObjectsApiError('Objekt ne obstaja.', 'NOT_FOUND')
+    objects = objects.filter((item) => item.id != id)
+    persist(objects)
+    return objects
+  },
   async reset(): Promise<SceneObjectData[]> {
     await wait()
     const objects = cloneInitial()
     persist(objects)
-    return objects
+    return structuredClone(objects)
   },
 }

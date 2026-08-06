@@ -28,6 +28,7 @@
       <div class="viewport-column">
         <SceneViewer
           :objects="objects"
+          :filteredObjects="filteredObjects"
           :selected-id="selectedObjectId"
           @object-selected="store.select"
         />
@@ -39,7 +40,8 @@
         />
       </div>
       <aside class="right-rail">
-        <ObjectDetails :object="selectedObject" @save="store.update" /><ObjectForm
+        <ObjectDetails :object="selectedObject" @remove="store.remove" @save="store.update" />
+        <ObjectForm
           @add="store.add"
         />
       </aside>

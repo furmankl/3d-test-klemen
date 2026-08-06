@@ -5,21 +5,23 @@ import { disposeThreeObject } from '@/utils/disposeThreeObject'
 import type { SceneObjectData } from '@/types/sceneObject'
 import { useSceneObjectsStore } from '@/stores/sceneObjectsStore'
 import { storeToRefs } from 'pinia'
+import { CSS2DObject, CSS2DRenderer, EffectComposer, OutlinePass, RenderPass } from 'three/examples/jsm/Addons.js'
+import { ref } from 'vue'
 
 export interface ThreeSceneController {
   syncObjects: (objects: SceneObjectData[]) => void
   pickObjectId: (event: PointerEvent) => string | null
   dispose: () => void
-  highlightObject: (id: string | null) => void
+  objectSelected: (id: string | null) => void
+  toggleMeasurementMode: () => boolean
 }
 
 export function createThreeScene(container: HTMLElement): ThreeSceneController {
   const scene = new THREE.Scene()
   const sceneObjectsStore = useSceneObjectsStore();
 
-  const { selectedObjectId } = storeToRefs(sceneObjectsStore);
+  const { selectedObjectId, filteredObjects, objects } = storeToRefs(sceneObjectsStore);
   const { select } = sceneObjectsStore
-  scene.background = new THREE.Color('#101d2b')
   scene.fog = new THREE.Fog('#101d2b', 18, 34)
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100)
@@ -30,6 +32,13 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
   renderer.shadowMap.enabled = true
   container.appendChild(renderer.domElement)
 
+  const labelRenderer = new CSS2DRenderer()
+  labelRenderer.setSize(container.clientWidth, container.clientHeight)
+  labelRenderer.domElement.style.position = 'absolute'
+  labelRenderer.domElement.style.top = '0px'
+  labelRenderer.domElement.style.pointerEvents = 'none'
+  container.appendChild(labelRenderer.domElement)
+  
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
   controls.target.set(0, 0.8, 0)
@@ -55,22 +64,48 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
   const pointer = new THREE.Vector2()
   let frameId = 0
 
+  let objectsToMeasure = ref<SceneObjectData[]>([])
+  let measuringModeActive: boolean = false;
+  let measuringLine: THREE.Line | null = null;
+  const outlinePass = new OutlinePass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    scene,
+    camera
+  )
+  const measurementDiv = document.createElement('div');
+  measurementDiv.className = 'spatial-measurement-label';
+  let measurementText: (CSS2DObject | null) = new CSS2DObject(measurementDiv);
+
+  const composer = new EffectComposer(renderer)
+
+  composer.addPass(new RenderPass(scene, camera))
+
   function resize(): void {
     const width = Math.max(container.clientWidth, 1)
     const height = Math.max(container.clientHeight, 1)
     camera.aspect = width / height
     camera.updateProjectionMatrix()
     renderer.setSize(width, height, false)
+    composer.setSize(width, height)
+    outlinePass.setSize(width, height)
   }
 
   const observer = new ResizeObserver(resize)
   observer.observe(container)
   resize()
 
+  outlinePass.edgeStrength = 5
+  outlinePass.edgeGlow = 0
+  outlinePass.edgeThickness = 2
+  outlinePass.visibleEdgeColor.set('#00ff00')
+
+  composer.addPass(outlinePass)
+
   function animate(): void {
     frameId = requestAnimationFrame(animate)
+    labelRenderer.render(scene, camera)
     controls.update()
-    renderer.render(scene, camera)
+    composer.render()
   }
   animate()
 
@@ -82,7 +117,7 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
         disposeThreeObject(mesh)
         meshes.delete(id)
       }
-      highlightObject(id);
+      objectSelected(id);
     }
     for (const item of objects) {
       let mesh = meshes.get(item.id)
@@ -91,9 +126,18 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
         meshes.set(item.id, mesh)
         objectGroup.add(mesh)
       }
+      const material = meshes.get(item.id)?.material as THREE.MeshStandardMaterial
+
+      if (filteredObjects.value.some((filteredItem) => filteredItem.id === item.id)) {
+        material.transparent = false;
+      } else {
+        material.transparent = true;
+        material.opacity = 0.2; 
+        material.needsUpdate = true 
+      }
+
       mesh.name = item.name
       mesh.visible = item.visible
-      console.log(`Syncing object: ${item.name}, ID: ${item.id}, Visible: ${item.visible}, Color: ${item.color}`)
       ;
       (mesh.material as THREE.MeshStandardMaterial).color.set(item.color)
     }
@@ -106,6 +150,53 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
     raycaster.setFromCamera(pointer, camera)
     const hit = raycaster.intersectObjects([...meshes.values()], false)[0];
 
+    if(measuringModeActive && hit?.object.userData.sceneObjectId) {
+      if(!objectsToMeasure.value.some((item) => item?.id === hit.object.userData.sceneObjectId)) {
+        if(objectsToMeasure.value.length >= 2) {
+          objectsToMeasure.value.shift()
+        }
+        objectsToMeasure.value.push(objects.value.find((item) => item.id === hit.object.userData.sceneObjectId)!)
+
+        if (objectsToMeasure.value.length == 2) {
+          // calculate distance between the two objects
+          const obj1 = meshes.get(objectsToMeasure.value[0].id)
+          const obj2 = meshes.get(objectsToMeasure.value[1].id)
+          if(obj1 && obj2) {
+            const distance = obj1.position.distanceTo(obj2.position)
+
+            const points = [];
+            points.push( obj1.position );
+            points.push( obj2.position );
+            const geometry = new THREE.BufferGeometry().setFromPoints( points );
+            const material = new THREE.LineBasicMaterial( { color: 0x0000ff } );
+
+            removeMeasurementUI()
+
+            measuringLine = new THREE.Line( geometry, material );
+            scene.add( measuringLine );
+            
+            measurementDiv.textContent = `${distance.toFixed(2)} m`;
+            measurementText = new CSS2DObject(measurementDiv);
+            measurementText.position.set(
+              (obj2.position.x + obj1.position.x) / 2, 
+            (obj2.position.y + obj1.position.y) / 2, 
+            (obj2.position.z + obj1.position.z) / 2);
+            scene.add(measurementText);
+          }
+        }
+      }
+      else {
+        objectsToMeasure.value = objectsToMeasure.value.filter((item) => item.id !== hit.object.userData.sceneObjectId)
+      }
+
+      if(objectsToMeasure.value.length < 2) {
+        removeMeasurementUI()
+      }
+
+      outlinePass.selectedObjects = [...objectsToMeasure.value.map((item) => meshes.get(item.id)!)];
+      return null;
+    }
+
     if(hit?.object.userData.sceneObjectId) {
       select(hit.object.userData.sceneObjectId);
     }
@@ -115,34 +206,73 @@ export function createThreeScene(container: HTMLElement): ThreeSceneController {
       : null
   }
 
+  function cleanUpAfterMeasurementMode() {
+    removeMeasurementUI()
+    objectsToMeasure.value = []
+    outlinePass.selectedObjects = []
+  }
+  function removeMeasurementUI() {
+    if(measuringLine) {
+      scene.remove(measuringLine)
+      disposeThreeObject(measuringLine)
+      measuringLine = null;
+    }
+    if(measurementText) {
+      scene.remove(measurementText)
+      disposeThreeObject(measurementText)
+      measurementText = null;
+    }
+  }
+
   function dispose(): void {
     cancelAnimationFrame(frameId)
     observer.disconnect()
     controls.dispose()
     objectGroup.children.forEach(disposeThreeObject)
     meshes.clear()
+    labelRenderer.domElement.remove()
     renderer.dispose()
     renderer.domElement.remove()
   }
 
-  function highlightObject(id: string | null): void {
+  function objectSelected(id: string | null): void {
     const highlight = selectedObjectId.value === id;
     // Create outline object
     
     if(id) {
       if(meshes.has(id)) {
-        // set opacity + scale it up
-
-        meshes.get(id)?.scale.set(highlight ? 1.05 : 1.0, highlight ? 1.05 : 1.0, highlight ? 1.05 : 1.0);
-        const material = meshes.get(id)?.material as THREE.MeshStandardMaterial
-
-        material.transparent = true;
-        material.opacity = highlight ? 0.9 : 1.0; 
-        material.needsUpdate = true 
+        // add object to "selectedObjects" array for the outline
+        if(highlight) {
+          const mesh = meshes.get(id)
+          outlinePass.selectedObjects = [mesh!]
+          if(!measuringModeActive)
+            controls.target.set(mesh?.position.x!, mesh?.position.y!, mesh?.position.z!)
+        }
       }
     }
-
-    animate();
+    else {
+      // empty the "selectedObjects" array to remove the outline
+      outlinePass.selectedObjects = [];
+      controls.target.set(0,0,0)
+    }
   }
-  return { syncObjects, pickObjectId, dispose, highlightObject }
+
+  function toggleMeasurementMode(): boolean {
+    if(measuringModeActive) {
+      measuringModeActive= false;
+      cleanUpAfterMeasurementMode();
+    } else {
+      measuringModeActive= true;
+    }
+    return measuringModeActive;
+  }
+
+
+  return { 
+    syncObjects, 
+    pickObjectId, 
+    dispose, 
+    objectSelected, 
+    toggleMeasurementMode
+   }
 }

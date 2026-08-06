@@ -5,6 +5,9 @@
         <span class="eyebrow">LASTNOSTI</span>
         <h2>Izbrani objekt</h2>
       </div>
+      <div>
+        <button class="button button--secondary" @click="remove" v-if="object">Izbriši</button>
+      </div>
     </div>
     <form v-if="object" class="stack" @submit.prevent="submit">
       <label class="field"><span>Ime</span><input v-model.trim="draft.name" type="text"  @click.capture="hasChanged" /></label>
@@ -37,15 +40,17 @@ import { reactive, watch } from 'vue'
 import type { SceneObjectData, SceneObjectPatch, Vector3Data } from '@/types/sceneObject'
 
 const props = defineProps<{ object: SceneObjectData | null }>()
-const emit = defineEmits<{  change: [], save: [id: string, patch: SceneObjectPatch],  }>()
+const emit = defineEmits<{  remove: [id: string], save: [id: string, patch: SceneObjectPatch],  }>()
 const draft = reactive({ name: '', color: '#ffffff', visible: true })
 let changed: boolean = false
 
 watch(
   () => props.object,
   (object) => {
-    if (object)
+    if (object) {
       Object.assign(draft, { name: object.name, color: object.color, visible: object.visible })
+      changed = false
+    }
   },
   { immediate: true },
 )
@@ -55,6 +60,9 @@ function hasChanged(): void {
 }
 const formatPosition = ({ x, y, z }: Vector3Data) =>
   `X ${x.toFixed(1)}  Y ${y.toFixed(1)}  Z ${z.toFixed(1)}`
+function remove(): void {
+  if (props.object) emit('remove', props.object.id)
+}
 function submit(): void {
   if (props.object) emit('save', props.object.id, { ...draft })
 }

@@ -26,12 +26,12 @@
         <div class="three-columns">
           <label class="field"
             ><span>X</span
-            ><input v-model.number="draft.position.x" type="number" step="0.5" /></label
+            ><input v-model.number="draft.position.x" type="number" step="0.1" /></label
           ><label class="field"
             ><span>Y</span
-            ><input v-model.number="draft.position.y" type="number" step="0.5" min="0" /></label
+            ><input v-model.number="draft.position.y" type="number" step="0.1" min="0" /></label
           ><label class="field"
-            ><span>Z</span><input v-model.number="draft.position.z" type="number" step="0.5"
+            ><span>Z</span><input v-model.number="draft.position.z" type="number" step="0.1"
           /></label>
         </div>
       </fieldset>
@@ -46,10 +46,16 @@ import { reactive, ref } from 'vue'
 import ErrorMessage from '@/components/ErrorMessage.vue'
 import { validateNewObject } from '@/utils/objectValidation'
 import type { NewSceneObject } from '@/types/sceneObject'
+import { storeToRefs } from 'pinia';
+import { useSceneObjectsStore } from '@/stores/sceneObjectsStore';
+
+const sceneObjectsStore = useSceneObjectsStore();
+
+const { objects } = storeToRefs(sceneObjectsStore);
 
 const emit = defineEmits<{ add: [object: NewSceneObject] }>()
 const errors = ref<string[]>([])
-const draft = reactive<NewSceneObject>({
+let draft = reactive<NewSceneObject>({
   name: '',
   type: 'box',
   color: '#22c55e',
@@ -57,10 +63,14 @@ const draft = reactive<NewSceneObject>({
   position: { x: 0, y: 0.7, z: 0 },
 })
 
+let draftCopy: NewSceneObject = { ...draft, position: { ...draft.position } }
+
 function submit(): void {
   errors.value = validateNewObject(draft)
+  if(objects.value.some((item) => item.name == draft.name)) errors.value.push('Ime že obstaja.')
+
   if (errors.value.length) return
-  // TODO(candidate): complete creation flow and reset the form after a successful save.
-  void emit
+  emit('add', { ...draft })
+  draft = { ...draftCopy}
 }
 </script>

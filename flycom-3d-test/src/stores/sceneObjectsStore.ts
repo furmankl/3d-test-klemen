@@ -19,11 +19,17 @@ export const useSceneObjectsStore = defineStore('sceneObjects', () => {
   const selectedObject = computed(
     () => objects.value.find((item) => item.id === selectedObjectId.value) ?? null,
   )
-  const filteredObjects = computed(() =>
-    typeFilter.value === 'all'
-      ? objects.value
-      : objects.value.filter((item) => item.type === typeFilter.value),
-  )
+  const filteredObjects = computed(() => {
+    if(typeFilter.value === 'all')
+      return objects.value;
+    else {
+      let filtered = objects.value.filter((item) => item.type === typeFilter.value)
+      if(!filtered.some((item) => item.id === selectedObjectId.value)) {
+        select(null)
+      }
+      return filtered
+    }
+  })
 
   async function load(): Promise<void> {
     isLoading.value = true
@@ -47,7 +53,7 @@ export const useSceneObjectsStore = defineStore('sceneObjects', () => {
     try {
       const created = await sceneObjectsApi.add(input)
       objects.value.push(created)
-      // TODO(candidate): decide whether the newly created object should become selected.
+      select(created.id)
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : 'Objekta ni bilo mogoče dodati.'
     } finally {
@@ -62,6 +68,22 @@ export const useSceneObjectsStore = defineStore('sceneObjects', () => {
       const saved = await sceneObjectsApi.update(id, patch)
       const index = objects.value.findIndex((item) => item.id === id)
       if (index >= 0) objects.value[index] = saved
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : 'Objekta ni bilo mogoče shraniti.'
+    } finally {
+      isSaving.value = false
+    }
+  }
+
+  async function remove(id: string): Promise<void> {
+    isSaving.value = true
+    error.value = null
+    try {
+      objects.value = await sceneObjectsApi.delete(id)
+
+      if(!objects.value.findIndex((item) => item.id === selectedObjectId.value)) {
+        select(null)
+      }
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : 'Objekta ni bilo mogoče shraniti.'
     } finally {
@@ -97,5 +119,6 @@ export const useSceneObjectsStore = defineStore('sceneObjects', () => {
     add,
     update,
     reset,
+    remove
   }
 })
